@@ -2,10 +2,8 @@ import numpy as np
 import timeit
 import matplotlib.pyplot as plt
 from pathlib import Path
-# import blobs_solver2 as pHyFlow
 import pHyFlow
-# import VorticityFoamPy as foam
-import solvers.particle as particle
+from solvers.dipole_initial import Dipole
 
 import os
 import sys
@@ -58,7 +56,6 @@ yMinPlot = config["yMinPlot"]
 yMaxPlot = config["yMaxPlot"]
 
 writeInterval_plots = config["writeInterval_plots"]
-run_analytical_flag = config["run_analytical_flag"]
 plot_flag = config["plot_flag"]
 
 vInfx = config["vInfx"]
@@ -66,7 +63,19 @@ vInfy = config["vInfy"]
 vInf = np.array([vInfx, vInfy])
 
 nu = config["nu"]
-gammaC = config["gammaC"]
+
+x1 = config['x1']
+y1 = config['y1']
+x2 = config['x2']
+y2 = config['y2']
+R = config['R']
+
+Gamma = config['Gamma']
+
+xMin = config['xMin']
+xMax = config['xMax']
+yMin = config['yMin']
+yMax = config['yMax']
 
 coreSize = config["coreSize"]
 
@@ -74,20 +83,6 @@ overlap = config["overlap"]
 
 deltaTc = config["deltaTc"]
 nTimeSteps = config["nTimeSteps"]
-
-N_initial = config['N_initial']
-
-# if coreSize == "fixed":
-#     sigma = float(2.0*(np.sqrt(N_initial*nu*deltaTc)))
-#     hBlob = sigma*overlap
-# else :
-#     sigma = np.array([2.0*(np.sqrt(N_initial*nu*deltaTc))])
-#     hBlob = sigma[0]*overlap
-
-if coreSize == "fixed":
-    sigma = float((np.sqrt(2.0*N_initial*nu*deltaTc)))
-else:
-    sigma = np.array([(np.sqrt(2.0*N_initial*nu*deltaTc))])
 
 compressionFlag = config['compressionFlag']
 compression_method = config["compression_method"]
@@ -124,18 +119,26 @@ compressionParams = {'method':compression_method, 'support':support_method, 'met
 xShift = config['xShift'] 
 yShift = config['yShift']
 #-------------------------------------------------------------------
-x0 = np.array([0.0])
-y0 = np.array([0.0])
 
-analytical_solver = particle.LambOseenVortexParticle(gammaC,N_initial * deltaTc,nu,x0[0],y0[0],vInfx,vInfy)
+hv = np.sqrt(deltaTc * nu)
+sigmaInit = float(overlap * np.sqrt(6) * hv)
+hBlob = sigmaInit / overlap
 
-xBlobFlat = np.array([0.0])
-yBlobFlat = np.array([0.0])
-xyBlobs = np.column_stack((xBlobFlat,yBlobFlat))
+initial_dipole = Dipole(Gamma, nu, x1, y1, x2, y2, R, vInfx, vInfy)
 
-g = np.array([gammaC])
+xBlob, yBlob = np.meshgrid(np.arange(xMin, xMax, hBlob), np.arange(yMin, yMax, hBlob))
+xBlobFlat = xBlob.flatten()
+yBlobFlat = yBlob.flatten()
+# xyBlobs = np.column_stack((xBlobFlat,yBlobFlat))
+
+g = initial_dipole.vorticity(xBlobFlat, yBlobFlat) * hBlob * hBlob
 
 wField = (xBlobFlat, yBlobFlat, g)
+
+if coreSize == 'fixed':
+    sigma = sigmaInit
+else:
+    sigma = np.full(xBlobFlat.shape, sigmaInit)
 
 blobs = pHyFlow.blobs.Blobs(wField,vInf,nu,deltaTc,sigma,overlap,xShift,yShift,
                             kernelParams=kernelParams,
@@ -160,22 +163,18 @@ if coreSize == 'variable':
     np.savetxt(os.path.join(data_dir, "blobs_{}_{n:06d}.csv".format(case,n=0)), np.c_[blobs.x, blobs.y, blobs.g, blobs.sigma], delimiter= ' ')
 else :
     np.savetxt(os.path.join(data_dir, "blobs_{}_{n:06d}.csv".format(case,n=0)), np.c_[blobs.x, blobs.y, blobs.g], delimiter= ' ')
-if run_analytical_flag:
-    analytical_ux, analytical_uy = analytical_solver.velocity(xyPlot)
-    analytical_vorticity = analytical_solver.vorticity(xyPlot)
-    np.savetxt(os.path.join(data_dir,"results_analytical_{n:06d}.csv".format(n=0)), np.c_[xplotflat,yplotflat,analytical_ux,analytical_uy,analytical_vorticity], delimiter=' ')
 
-for timeStep in range(N_initial,nTimeSteps+1+N_initial):
+for timeStep in range(1, nTimeSteps+1):
     time_start = timeit.default_timer()
+    blobs.populationControl()
     blobs.evolve()
-    # if (compressionFlag and (timeStep%compression_stride == 0 or timeStep == 1)):
-    #     print('----------------Performing Compression--------------')
-    #     nbefore = blobs.numBlobs
-    #     blobs._compress()
-    #     blobs.populationControl()
-    #     nafter = blobs.numBlobs
-    #     print(f'removed {nbefore-nafter} particles')
-        # print(f'current number of particles: {nafter}')
+    if (compressionFlag and (timeStep%compression_stride == 0 or timeStep == 1)):
+        print('----------------Performing Compression--------------')
+        nbefore = blobs.numBlobs
+        blobs._compress()
+        nafter = blobs.numBlobs
+        print(f'removed {nbefore-nafter} particles')
+        print(f'current number of particles: {nafter}')
     time_end = timeit.default_timer()
     print("Time to evolve in timeStep {} is {}".format(timeStep,time_end - time_start))
 
@@ -188,13 +187,6 @@ for timeStep in range(N_initial,nTimeSteps+1+N_initial):
         writer = csv.writer(f)
         writer.writerow(data)
 
-    if run_analytical_flag:
-        start_time_analytical = timeit.default_timer()
-        analytical_solver.evolve(deltaTc)
-        end_time_analytical = timeit.default_timer()
-
-        print("Analytical run in {} seconds".format(end_time_analytical - start_time_analytical))
-
     if timeStep%writeInterval_plots==0 :
         ux, uy = blobs.evaluateVelocity(xplotflat,yplotflat)
         omega = blobs.evaluateVorticity(xplotflat,yplotflat)
@@ -205,13 +197,6 @@ for timeStep in range(N_initial,nTimeSteps+1+N_initial):
             np.savetxt(os.path.join(data_dir, "blobs_{}_{n:06d}.csv".format(case,n=timeStep)), np.c_[blobs.x, blobs.y, blobs.g, blobs.sigma], delimiter= ' ')
         else :
             np.savetxt(os.path.join(data_dir, "blobs_{}_{n:06d}.csv".format(case,n=timeStep)), np.c_[blobs.x, blobs.y, blobs.g], delimiter= ' ')
-
-        if run_analytical_flag:
-            analytical_ux, analytical_uy = analytical_solver.velocity(xyPlot)
-            analytical_vorticity = analytical_solver.vorticity(xyPlot)
-            np.savetxt(os.path.join(data_dir,"results_analytical_{n:06d}.csv".format(n=timeStep)), np.c_[xplotflat,yplotflat,analytical_ux,analytical_uy,analytical_vorticity], delimiter=' ')
-    
-
 
 if plot_flag == True:
     uxNorm = np.array([])
@@ -239,7 +224,7 @@ if plot_flag == True:
     plt.savefig("{}/number_of_particles_{}.png".format(plots_dir,case), dpi=300, bbox_inches="tight")
 
     fig, ax = plt.subplots(1,1,figsize=(6,6))
-    ax.plot(time,circulation- gammaC, label='Circulation deficit')
+    ax.plot(time,circulation- Gamma, label='Circulation deficit')
     plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
     plt.minorticks_on()
     plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
@@ -258,7 +243,7 @@ if plot_flag == True:
     plt.title('Evolution time')
     plt.savefig("{}/times_{}.png".format(plots_dir,case), dpi=300, bbox_inches="tight")
 
-    for timeStep in range(N_initial, nTimeSteps+1 + N_initial):
+    for timeStep in range(1, nTimeSteps+1):
         if timeStep%writeInterval_plots == 0:
             ####Fields
             lagrangian_file = os.path.join(data_dir,'results_{}_{n:06d}.csv'.format(case,n=timeStep))
@@ -273,13 +258,6 @@ if plot_flag == True:
             lagrangian_ux = lagrangian_data[:,2]
             lagrangian_uy = lagrangian_data[:,3]
             lagrangian_omega = lagrangian_data[:,4]
-
-            analytical_file = os.path.join(data_dir,'results_analytical_{n:06d}.csv'.format(case,n=timeStep))
-            analytical_data = np.genfromtxt(analytical_file)
-
-            analytical_ux = analytical_data[:,2]
-            analytical_uy = analytical_data[:,3]
-            analytical_omega = analytical_data[:,4]
 
             xTicks = np.linspace(-2,2,5)
             yTicks = np.linspace(-2,2,5)
@@ -316,59 +294,6 @@ if plot_flag == True:
             plt.savefig("{}/velocity_{}_{}.png".format(plots_dir,case,timeStep), dpi=300, bbox_inches="tight")
             plt.close(fig)
 
-            if run_analytical_flag==True:
-                fig, ax = plt.subplots(1,1,figsize=(6,6))
-                ax.set_aspect("equal")
-                ax.set_xticks(xTicks)
-                ax.set_yticks(yTicks)
-                plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
-                plt.minorticks_on()
-                plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
-                ax.set_xlabel("x")
-                ax.set_ylabel("y")
-                cax = ax.contourf(xPlotMesh,yPlotMesh,analytical_omega.reshape(length,length),levels=100,cmap='RdBu',extend="both")
-                cbar = fig.colorbar(cax,format="%.4f")
-                cbar.set_label("Vorticity (1/s)")
-                plt.tight_layout()
-                plt.savefig("{}/vorticity_analytical_{}.png".format(plots_dir,timeStep), dpi=300, bbox_inches="tight")
-                plt.close(fig)
-
-                fig, ax = plt.subplots(1,1,figsize=(6,6))
-                ax.set_aspect("equal")
-                ax.set_xticks(xTicks)
-                ax.set_yticks(yTicks)
-                plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
-                plt.minorticks_on()
-                plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
-                ax.set_xlabel("x")
-                ax.set_ylabel("y")
-                cax = ax.contourf(xPlotMesh,yPlotMesh,analytical_ux.reshape(length,length),levels=100,cmap='RdBu',extend="both")
-                cbar = fig.colorbar(cax,format="%.4f")
-                cbar.set_label("Velocity (1/s)")
-                plt.tight_layout()
-                plt.savefig("{}/velocity_analytical_{}.png".format(plots_dir,timeStep), dpi=300, bbox_inches="tight")
-                plt.close(fig)
-
-#### Errors
-            omegaScale = np.max(np.abs(analytical_omega))
-
-            omega_error = ((lagrangian_omega - analytical_omega)/(omegaScale))*100
-            fig, ax = plt.subplots(1,1,figsize=(6,6))
-            ax.set_aspect("equal")
-            ax.set_xticks(xTicks)
-            ax.set_yticks(yTicks)
-            plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
-            plt.minorticks_on()
-            plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
-            ax.set_xlabel("x")
-            ax.set_ylabel("y")
-            cax = ax.contourf(xPlotMesh,yPlotMesh,omega_error.reshape(length,length),levels=100,cmap='jet',extend="both")
-            cbar = fig.colorbar(cax,format="%.4f")
-            cbar.set_label("Vorticity error (%) (1/s)")
-            plt.tight_layout()
-            plt.savefig("{}/vorticity_error_{}_{}.png".format(plots_dir,case,timeStep), dpi=300, bbox_inches="tight")
-            plt.close(fig)
-
 
 #### Blobs distribution
 
@@ -397,24 +322,3 @@ if plot_flag == True:
                 ax.scatter(blobs_x,blobs_y,c=blobs_g, s=0.2)
                 plt.savefig("{}/blobs_{}_{}.png".format(plots_dir,case,timeStep), dpi=300, bbox_inches="tight")
                 plt.close(fig)
-
-
-#### L2 errors in vorticity and velocity
-
-
-            uxNorm = np.append(uxNorm,np.linalg.norm(lagrangian_ux-analytical_ux)/np.linalg.norm(analytical_ux))
-            uyNorm = np.append(uyNorm,np.linalg.norm(lagrangian_uy-analytical_uy)/np.linalg.norm(analytical_uy))
-            omegaNorm = np.append(omegaNorm,np.linalg.norm(lagrangian_omega-analytical_omega)/np.linalg.norm(analytical_omega))
-            t_norm = np.append(t_norm,deltaTc*timeStep)
-    fig, ax = plt.subplots(1,1,figsize=(6,6))
-    plt.plot(t_norm,uxNorm, label='ux-L2 error')
-    plt.plot(t_norm,uyNorm, label='uy-L2 error')
-    plt.plot(t_norm,omegaNorm, label='omega-L2 error')
-    plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
-    plt.minorticks_on()
-    plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
-    plt.ylabel('L2-error')
-    plt.xlabel('time')
-    plt.legend()
-    plt.savefig("{}/L2_error_{}.png".format(plots_dir,case), dpi=300, bbox_inches="tight")
-    plt.close(fig)
