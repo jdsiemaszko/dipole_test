@@ -8,8 +8,8 @@ plots_folder : 'plots'
 
 
 #--------------------------Time Params--------------------------------------#
-nTimeSteps : 1000    #number of lagrangian time-steps
-writeInterval_plots : 100     
+nTimeSteps : 4000    #number of lagrangian time-steps
+writeInterval_plots : 400     
 
 deltaTc : 2.5e-4       #lagrangian, convection time-step
 
@@ -26,19 +26,18 @@ y2 : -0.1
 R : 0.1
 
 
-
 #---------------------------Lagrangian Params-------------------------------------#
 
 vInfx : 0.0           #freestream velocity in x direction
 vInfy : 0.0           #freestream velocity in y direction
 overlap : 1.0         #blobs' overlap ratio
-xMin : -1.5
-xMax : -0.5
-yMin : -0.6
-yMax : 0.6
+xMin : -1.25
+xMax : -0.75
+yMin : -0.35
+yMax : 0.35
 
   #Computation Params
-hardware : "cpu"
+hardware : "gpu"
 method : "direct"
 
 #Blob Control Params
@@ -70,10 +69,10 @@ yShift : 0.0
 #--------------------------- Compression Params -------------------------------------#
 
 compressionFlag : True
-compression_stride : 500
+compression_stride : 1000
 
 compression_method : 'remesh'
-compression_params : {'Csigma' : 1.0, 'margin' : 0.05, 'sigma_max' : 0.1, 'compression' : 0.75, 'assignment_type' : 'M4prime'}
+compression_params : {'Csigma' : 1.0, 'margin' : 0.05, 'sigma_max' : 0.1, 'compression' : 0.80, 'assignment_type' : 'M4prime'}
 
 support_method : 'all'
 support_params : {}

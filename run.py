@@ -121,11 +121,11 @@ yShift = config['yShift']
 #-------------------------------------------------------------------
 
 hv = np.sqrt(deltaTc * nu)
-sigmaInit = float(overlap * np.sqrt(6) * hv)
+sigmaInit = float(overlap * np.sqrt(12) * hv)
 hBlob = sigmaInit / overlap
 
 initial_dipole = Dipole(Gamma, nu, x1, y1, x2, y2, R, vInfx, vInfy)
-
+del Dipole
 xBlob, yBlob = np.meshgrid(np.arange(xMin, xMax, hBlob), np.arange(yMin, yMax, hBlob))
 xBlobFlat = xBlob.flatten()
 yBlobFlat = yBlob.flatten()
@@ -163,12 +163,11 @@ if coreSize == 'variable':
     np.savetxt(os.path.join(data_dir, "blobs_{}_{n:06d}.csv".format(case,n=0)), np.c_[blobs.x, blobs.y, blobs.g, blobs.sigma], delimiter= ' ')
 else :
     np.savetxt(os.path.join(data_dir, "blobs_{}_{n:06d}.csv".format(case,n=0)), np.c_[blobs.x, blobs.y, blobs.g], delimiter= ' ')
-
+blobs.populationControl()
 for timeStep in range(1, nTimeSteps+1):
     time_start = timeit.default_timer()
-    blobs.populationControl()
     blobs.evolve()
-    if (compressionFlag and (timeStep%compression_stride == 0 or timeStep == 1)):
+    if (compressionFlag and timeStep%compression_stride == 0):
         print('----------------Performing Compression--------------')
         nbefore = blobs.numBlobs
         blobs._compress()
@@ -224,7 +223,7 @@ if plot_flag == True:
     plt.savefig("{}/number_of_particles_{}.png".format(plots_dir,case), dpi=300, bbox_inches="tight")
 
     fig, ax = plt.subplots(1,1,figsize=(6,6))
-    ax.plot(time,circulation- Gamma, label='Circulation deficit')
+    ax.plot(time,circulation, label='Circulation deficit')
     plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
     plt.minorticks_on()
     plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
@@ -243,7 +242,7 @@ if plot_flag == True:
     plt.title('Evolution time')
     plt.savefig("{}/times_{}.png".format(plots_dir,case), dpi=300, bbox_inches="tight")
 
-    for timeStep in range(1, nTimeSteps+1):
+    for timeStep in range(0, nTimeSteps+1):
         if timeStep%writeInterval_plots == 0:
             ####Fields
             lagrangian_file = os.path.join(data_dir,'results_{}_{n:06d}.csv'.format(case,n=timeStep))

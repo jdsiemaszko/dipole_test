@@ -8,8 +8,8 @@ plots_folder : 'plots'
 
 
 #--------------------------Time Params--------------------------------------#
-nTimeSteps : 1000    #number of lagrangian time-steps
-writeInterval_plots : 100     
+nTimeSteps : 4000    #number of lagrangian time-steps
+writeInterval_plots : 400     
 
 deltaTc : 2.5e-4      #lagrangian, convection time-step
 
@@ -23,6 +23,7 @@ x1 : -1.0
 y1 : 0.1
 x2 : -1.0
 y2 : -0.1
+
 R : 0.1
 
 
@@ -32,13 +33,13 @@ R : 0.1
 vInfx : 0.0           #freestream velocity in x direction
 vInfy : 0.0           #freestream velocity in y direction
 overlap : 1.0         #blobs' overlap ratio
-xMin : -1.5
-xMax : -0.5
-yMin : -0.6
-yMax : 0.6
+xMin : -1.25
+xMax : -0.75
+yMin : -0.35
+yMax : 0.35
 
   #Computation Params
-hardware : "cpu"
+hardware : "gpu"
 method : "direct"
 
 #Blob Control Params
