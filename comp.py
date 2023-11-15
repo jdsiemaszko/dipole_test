@@ -11,6 +11,9 @@ import pHyFlow
 from pHyFlow.blobs.base.induced import vorticity
 import matplotlib.pyplot as plt
 
+PlotFlag = False
+suffix1 = ""
+suffix2 = ""
 #---------------Current directory and paths---------------------F---------------
 arg = sys.argv
 if len(arg) > 3:
@@ -39,15 +42,15 @@ config2 = yaml.load(open(os.path.join(config2File)),Loader=loader)
 case1 = config1['case']
 
 case_dir1 = os.path.join(os.getcwd(), 'results', case1)
-data_dir1 = os.path.join(case_dir1,config1["data_folder"])
-plots_dir1= os.path.join(case_dir1,config1["plots_folder"])
+data_dir1 = os.path.join(case_dir1,config1["data_folder"]+suffix1)
+plots_dir1= os.path.join(case_dir1,config1["plots_folder"]+suffix1)
 
 
 case2 = config2['case']
 
 case_dir2 = os.path.join(os.getcwd(), 'results', case2)
-data_dir2 = os.path.join(case_dir2,config2["data_folder"])
-plots_dir2 = os.path.join(case_dir2,config2["plots_folder"])
+data_dir2 = os.path.join(case_dir2,config2["data_folder"]+suffix2)
+plots_dir2 = os.path.join(case_dir2,config2["plots_folder"]+suffix2)
 
 comp_dir = os.path.join(os.getcwd(), 'results', 'comparisons')
 
@@ -150,6 +153,11 @@ for p1, p2 in zip(plotting_params1, plotting_params2):
 time = []
 L2error = []
 Linferror = []
+B_errorL2 = []
+B_errorLinf = []
+B_errorAbs = []
+max_omega1 = []
+max_omega2 = []
 
 if not plotting_param_mishmatch:
     for timeStep in range(0, nTimeSteps+1):
@@ -174,46 +182,59 @@ if not plotting_param_mishmatch:
             uy2 = data2[:,3]
             omega2 = data2[:,4]
 
-            # xTicks = np.linspace(-xMinPlot1, xMaxPlot1, 5)
-            # yTicks = np.linspace(-yMinPlot1, yMaxPlot1, 5)
+            max_omega1.append(np.max(omega1))
+            max_omega2.append(np.max(omega2))
 
-            fig, ax = plt.subplots(1,1,figsize=(6,6))
-            ax.set_aspect("equal")
-            # ax.set_xticks(xTicks)
-            # ax.set_yticks(yTicks)
-            plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
-            plt.minorticks_on()
-            plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
-            ax.set_xlabel("x")
-            ax.set_ylabel("y")
-            cax = ax.contourf(xPlotMesh,yPlotMesh,np.abs((omega1.reshape(length,length) - omega2.reshape(length, length))) / max(np.abs(omega2)),levels=100,cmap='RdBu',extend="both")
-            cbar = fig.colorbar(cax,format="%.4f")
-            cbar.set_label("Vorticity Error (%)")
-            plt.tight_layout()
-            plt.savefig("{}/vorticity_error_%_{}_vs_{}_{}.png".format(plots_dir,case1,case2, timeStep), dpi=300, bbox_inches="tight")
-            plt.close(fig)
-            
-            fig, ax = plt.subplots(1,1,figsize=(6,6))
-            ax.set_aspect("equal")
-            # ax.set_xticks(xTicks)
-            # ax.set_yticks(yTicks)
-            plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
-            plt.minorticks_on()
-            plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
-            ax.set_xlabel("x")
-            ax.set_ylabel("y")
-            abs_vel_error = np.sqrt((ux1.reshape(length,length) - ux2.reshape(length, length))**2 + (uy1.reshape(length,length) - uy2.reshape(length, length))**2)
-            vel_magnitude = np.sqrt(ux2.reshape(length,length)**2+uy2.reshape(length,length)**2)
-            cax = ax.contourf(xPlotMesh,yPlotMesh,abs_vel_error / np.max(vel_magnitude),levels=100,cmap='RdBu',extend="both")
-            cbar = fig.colorbar(cax,format="%.4f")
-            cbar.set_label("Velocity Error (%)")
-            plt.tight_layout()
-            plt.savefig("{}/velocity_error_%_{}_vs_{}_{}.png".format(plots_dir,case1, case2,timeStep), dpi=300, bbox_inches="tight")
-            plt.close(fig)
+            b_omega1 = omega1[np.where(xplot == -1)]
+            b_omega2 = omega2[np.where(xplot == -1)]
+
+            B_errorL2.append(np.linalg.norm(b_omega1 - b_omega2) /max(np.abs(b_omega2)))
+            B_errorLinf.append(max(np.abs(b_omega1-b_omega2)) / max(np.abs(b_omega2)))
+            B_errorAbs.append(max(np.abs(b_omega1 - b_omega2)))
 
             time.append(timeStep)
-            L2error.append(np.linalg.norm(omega1-omega2) / np.linalg.norm(omega2))
+            L2error.append(np.linalg.norm(omega1-omega2) / max(np.abs(omega2)))
             Linferror.append(max(np.abs(omega1-omega2)) / max(np.abs(omega2)))
+
+
+            # xTicks = np.linspace(-xMinPlot1, xMaxPlot1, 5)
+            # yTicks = np.linspace(-yMinPlot1, yMaxPlot1, 5)
+            if PlotFlag:
+                fig, ax = plt.subplots(1,1,figsize=(6,6))
+                ax.set_aspect("equal")
+                # ax.set_xticks(xTicks)
+                # ax.set_yticks(yTicks)
+                plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
+                plt.minorticks_on()
+                plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+                ax.set_xlabel("x")
+                ax.set_ylabel("y")
+                cax = ax.contourf(xPlotMesh,yPlotMesh,np.abs((omega1.reshape(length,length) - omega2.reshape(length, length))) / max(np.abs(omega2)),levels=100,cmap='RdBu',extend="both")
+                cbar = fig.colorbar(cax,format="%.4f")
+                cbar.set_label("Vorticity Error (%)")
+                plt.tight_layout()
+                plt.savefig("{}/vorticity_error_%_{}_vs_{}_{}.png".format(plots_dir,case1,case2, timeStep), dpi=300, bbox_inches="tight")
+                plt.close(fig)
+                
+                fig, ax = plt.subplots(1,1,figsize=(6,6))
+                ax.set_aspect("equal")
+                # ax.set_xticks(xTicks)
+                # ax.set_yticks(yTicks)
+                plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
+                plt.minorticks_on()
+                plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+                ax.set_xlabel("x")
+                ax.set_ylabel("y")
+                abs_vel_error = np.sqrt((ux1.reshape(length,length) - ux2.reshape(length, length))**2 + (uy1.reshape(length,length) - uy2.reshape(length, length))**2)
+                vel_magnitude = np.sqrt(ux2.reshape(length,length)**2+uy2.reshape(length,length)**2)
+                cax = ax.contourf(xPlotMesh,yPlotMesh,abs_vel_error / np.max(vel_magnitude),levels=100,cmap='RdBu',extend="both")
+                cbar = fig.colorbar(cax,format="%.4f")
+                cbar.set_label("Velocity Error (%)")
+                plt.tight_layout()
+                plt.savefig("{}/velocity_error_%_{}_vs_{}_{}.png".format(plots_dir,case1, case2,timeStep), dpi=300, bbox_inches="tight")
+                plt.close(fig)
+
+            
 
 else:
     print(f'skipping vorticity and velocity plots due to plotting parameter mismatch!')
@@ -307,13 +328,52 @@ else:
 
 plt.clf()
 fig, ax1 = plt.subplots(figsize=(6,6))
-ax1.plot(time, L2error, label='L2', color = 'tab:blue', marker='x')
-ax2 = ax1.twinx()
-ax2.plot(time, Linferror, label='Linf', color='tab:red', marker='x')
+ax1.plot(time, L2error, label='L_2', color = 'r', marker='x')
+# ax2 = ax1.twinx()
+# ax2.plot(time, Linferror, label='Linf', color='tab:red', marker='x')
+ax1.plot(time, Linferror, label='L_inf', color='b', marker='x')
 ax1.set_xlabel('Timestep')
-ax1.set_ylabel('L2 Error', color='tab:blue')
-ax2.set_ylabel('Linf error', color='tab:red')
+ax1.set_ylabel('Error')
+plt.legend()
+plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
+plt.minorticks_on()
+plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+# ax2.set_ylabel('Linf error', color='tab:red')
 plt.title('Error Evolution Over Time')
 plt.savefig("{}/error_evolution_{}_vs_{}.png".format(plots_dir,case1, case2), dpi=300, bbox_inches="tight")
 
+plt.clf()
+fig, ax1 = plt.subplots(figsize=(6,6))
+ax1.plot(time, B_errorAbs, color = 'r', marker='x')
+# ax2 = ax1.twinx()
+# ax2.plot(time, Linferror, label='Linf', color='tab:red', marker='x')
+# ax1.plot(time, B_errorLinf, label='L_inf', color='b', marker='x')
+ax1.set_xlabel('Timestep')
+ax1.set_ylabel('Error')
+plt.legend()
+plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
+plt.minorticks_on()
+plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+# ax2.set_ylabel('Linf error', color='tab:red')
+plt.title('Boundary Error Evolution Over Time (Absolute)')
+plt.savefig("{}/boundary_error_evolution_{}_vs_{}.png".format(plots_dir,case1, case2), dpi=300, bbox_inches="tight")
 
+
+write_time = np.arange(0, deltaTc*(nTimeSteps+1), deltaTc*writeInterval_plots1)
+reference_data = np.loadtxt(os.getcwd() + "/reference_vorticity.csv", delimiter=",", dtype = np.float64, skiprows=1)
+
+fig, ax = plt.subplots(1,1,figsize=(6,6))
+plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
+plt.minorticks_on()
+plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+ax.set_xlabel("Time")
+ax.set_ylabel("Maximum Vorticity")
+minx = np.min(xPlotMesh)
+indeces = np.where(xPlotMesh == minx)[0]
+plt.plot(write_time, max_omega1, marker='x', label=case1, color = 'r')
+plt.plot(write_time, max_omega2, marker='2', label=case2, color = 'b')
+plt.plot(reference_data[:, 0], reference_data[:, 1], label='FE (reference)', color='k')
+plt.legend()
+plt.tight_layout()
+plt.savefig("{}/max_vorticity_comparison_{}_vs_{}.png".format(plots_dir,case1, case2), dpi=300, bbox_inches="tight")
+plt.close(fig)

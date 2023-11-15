@@ -154,6 +154,9 @@ else:
     blobs_g = blobs_data[:,2]
     if coreSize == 'variable':
         blobs_sigma = blobs_data[:,3]
+    else:
+        hv = np.sqrt(deltaTc * nu)
+        blobs_sigma = float(overlap * np.sqrt(12) * hv)
 
 wField = (blobs_x, blobs_y, blobs_g)
 
