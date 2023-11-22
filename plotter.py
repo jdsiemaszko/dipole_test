@@ -14,7 +14,7 @@ import re
 import csv
 import pandas
 
-suffix = "_1"
+suffix = ""
 PlotFlag = False
 
 #---------------Current directory and paths-------------------
