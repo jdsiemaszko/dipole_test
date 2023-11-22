@@ -15,6 +15,7 @@ import csv
 import pandas
 
 suffix = ""
+# PlotFlag = True
 PlotFlag = False
 
 #---------------Current directory and paths-------------------
@@ -197,7 +198,7 @@ for timeStep in range(0, nTimeSteps+1):
 
 write_time = np.arange(0, deltaTc*(nTimeSteps+1), deltaTc*writeInterval_plots)
 reference_data = np.loadtxt(os.getcwd() + "/reference_vorticity.csv", delimiter=",", dtype = np.float64, skiprows=1)
-
+ind = np.where(write_time <= np.max(reference_data[:, 0]))[0]
 fig, ax = plt.subplots(1,1,figsize=(6,6))
 plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
 plt.minorticks_on()
@@ -206,8 +207,8 @@ ax.set_xlabel("Time")
 ax.set_ylabel("Maximum Vorticity")
 minx = np.min(xPlotMesh)
 indeces = np.where(xPlotMesh == minx)[0]
-plt.plot(write_time, max_omega, marker='x', label=case, color = 'r')
-plt.plot(reference_data[:, 0], reference_data[:, 1], marker='*', label='FE (reference)', color='k')
+plt.plot(write_time[ind], max_omega[ind], marker='x', label=case, color = 'r')
+plt.plot(reference_data[:, 0], reference_data[:, 1], label='FE (reference)', color='k')
 plt.legend()
 plt.tight_layout()
 plt.savefig("{}/max_vorticity_evolution_{}.png".format(plots_dir,case), dpi=300, bbox_inches="tight")

@@ -11,6 +11,7 @@ import pHyFlow
 from pHyFlow.blobs.base.induced import vorticity
 import matplotlib.pyplot as plt
 
+# PlotFlag = True
 PlotFlag = False
 suffix1 = ""
 suffix2 = ""
@@ -361,17 +362,17 @@ plt.savefig("{}/boundary_error_evolution_{}_vs_{}.png".format(plots_dir,case1, c
 
 write_time = np.arange(0, deltaTc*(nTimeSteps+1), deltaTc*writeInterval_plots1)
 reference_data = np.loadtxt(os.getcwd() + "/reference_vorticity.csv", delimiter=",", dtype = np.float64, skiprows=1)
-
+ind = np.where(write_time <= np.max(reference_data[:, 0]))[0]
+max_omega1 = np.array(max_omega1)
+max_omega2 = np.array(max_omega2)
 fig, ax = plt.subplots(1,1,figsize=(6,6))
 plt.grid(color = '#666666', which='major', linestyle = '--', linewidth = 0.5)
 plt.minorticks_on()
 plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
 ax.set_xlabel("Time")
 ax.set_ylabel("Maximum Vorticity")
-minx = np.min(xPlotMesh)
-indeces = np.where(xPlotMesh == minx)[0]
-plt.plot(write_time, max_omega1, marker='x', label=case1, color = 'r')
-plt.plot(write_time, max_omega2, marker='2', label=case2, color = 'b')
+plt.plot(write_time[ind], max_omega1[ind], marker='x', label=case1, color = 'r')
+plt.plot(write_time[ind], max_omega2[ind], marker='2', label=case2, color = 'b')
 plt.plot(reference_data[:, 0], reference_data[:, 1], label='FE (reference)', color='k')
 plt.legend()
 plt.tight_layout()
